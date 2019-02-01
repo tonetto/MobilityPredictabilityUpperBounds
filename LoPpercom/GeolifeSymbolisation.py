@@ -29,15 +29,13 @@ from multiprocessing import Pool, cpu_count
 from datetime import timedelta
 fmt = '%Y-%m-%d %H:%M:%S'
 
-#========
+# ========
 # PATHS
-#========
+# ========
 
-main_geolifedb = '../DataGeolife/geolife.sqlite' # will be created if it doesn't exist
-preprocessing_dir = '../DataGeolife/Preproc' # folder for semi-temporary databases for specific quantisations, will be created if they don't exist
-geolife_zipfile_data_dir = '~/Downloads/Geolife Trajectories 1.3/Data' # folder for the original data. Used to build the above databases if they don't exist.
-
-
+main_geolifedb = '../DataGeolife/geolife.sqlite'    # will be created if it doesn't exist
+preprocessing_dir = '../DataGeolife/Preproc'    # folder for temporary databases for quantisation
+geolife_zipfile_data_dir = '~/Downloads/Geolife Trajectories 1.3/Data'  # original data, builds databases if don't exist
 
 ensure_dir(main_geolifedb)
 ensure_dir(preprocessing_dir)
@@ -46,13 +44,14 @@ ensure_dir(preprocessing_dir)
 if '~' in geolife_zipfile_data_dir:
     geolife_zipfile_data_dir = os.path.expanduser(geolife_zipfile_data_dir)
 
-#========
+# ========
+
 
 def build_specific_cache( spatialRes_temporalRes_pair ):
     spatialRes = spatialRes_temporalRes_pair[0]
     temporalRes = spatialRes_temporalRes_pair[1]
     
-    print 'Processing spatial res {}, temporal res {}'.format( spatialRes, temporalRes )
+    print('Processing spatial res {}, temporal res {}'.format( spatialRes, temporalRes ))
     
     if not os.path.exists( "{}/S{}T{}.sqlite".format(preprocessing_dir,spatialRes, temporalRes) ):
         buildPreprocessingTable(spatialRes,temporalRes,nest = True)
@@ -72,25 +71,23 @@ def bulk_build_resolution_cache(listSpatialRes, listTemporalRes, personsId = "Al
     :type personsId: List of ints
     """
     
-    if not os.path.exists( main_geolifedb ):
+    if not os.path.exists(main_geolifedb):
         build_main_db()
     
     pairs = []
     for spatialRes in listSpatialRes:
         for temporalRes in listTemporalRes:
-            pairs.append( (spatialRes, temporalRes) )
+            pairs.append((spatialRes, temporalRes))
             
-            #for debugging
-            #build_specific_cache( pairs[-1] )
-    #exit(-1)
+            # for debugging
+            # build_specific_cache( pairs[-1] )
+    # exit(-1)
     
-    pool = Pool( processes = cpu_count() - 2 ) # leave some CPU for day to day tasks :-), 2 actual is one real CPU core on a Intel hyperthreaded system
-    pool.map(build_specific_cache, pairs ) # the function "match( symbol_idx )" will now be called in parallel with the argument 0,1,... etc.
+    pool = Pool( processes = cpu_count() - 2)   # leave some CPU
+    pool.map(build_specific_cache, pairs )      # "match( symbol_idx )" is called in parallel with the args 0,1,... etc.
     pool.close()
     pool.join()
     
-
-
 
 def get_geolife_data(spatialRes, temporalRes, personsId = "All" ):
     """
@@ -105,25 +102,24 @@ def get_geolife_data(spatialRes, temporalRes, personsId = "All" ):
     :type personsId: List of ints
     """
     
-    if not os.path.exists( "{}/S{}T{}.sqlite".format(preprocessing_dir,spatialRes, temporalRes) ):
-        if not os.path.exists( main_geolifedb ):
+    if not os.path.exists( "{}/S{}T{}.sqlite".format(preprocessing_dir, spatialRes, temporalRes)):
+        if not os.path.exists(main_geolifedb):
             build_main_db()
         else:
             # ensure it has the table we need in it
             pass
             
-        buildPreprocessingTable(spatialRes,temporalRes,nest = True, personsIds=personsId)
+        buildPreprocessingTable(spatialRes, temporalRes, nest=True, personsIds=personsId)
     
-    return loadData(spatialRes, temporalRes, personsId )
+    return loadData(spatialRes, temporalRes, personsId)
 
 
-
-#==============================================
+# ==============================================
 #        Helper methods
 
-#load preprocessing data  from the data base :
+# load preprocessing data  from the data base :
 def loadData(spatialRes, temporalRes, personsId = "All", withDates = False):
-    print "loading..."
+    print("loading...")
     
     connection = apsw.Connection("{}/S{}T{}.sqlite".format(preprocessing_dir,spatialRes, temporalRes))
     
@@ -131,10 +127,10 @@ def loadData(spatialRes, temporalRes, personsId = "All", withDates = False):
     curs2 = connection.cursor()
     curs3 = connection.cursor()
     
-    data =[]
+    data = []
 #    idPerson = []
-    if(personsId == "All"):
-        #All
+    if personsId == "All":
+        # All
         sql = "SELECT DISTINCT person FROM preproc GROUP BY person "
     #    #    WHERE person = 35
         personsId = map(lambda x: x[0],curs1.execute(sql) )
@@ -151,7 +147,9 @@ def loadData(spatialRes, temporalRes, personsId = "All", withDates = False):
         trajectories = curs2.execute(sql).fetchall()
         
         if len(trajectories) == 0:
-            raise Exception("Error: The cache did not have the requested person ID. This is most likely because the bulk cache building method was used, which is hardcoded to only load the person IDs used in the PERCOM paper.")
+            raise Exception("Error: The cache did not have the requested person ID. This is most likely because the"
+                            "bulkcache building method was used, which is hardcoded to only load the person IDs used"
+                            "in the PERCOM paper.")
         
         t_ct = 0
         for t in trajectories:
@@ -160,12 +158,12 @@ def loadData(spatialRes, temporalRes, personsId = "All", withDates = False):
             sql = "SELECT idxPix, datetime FROM preproc WHERE person = {} AND traj = {} ORDER BY datetime".format(person,traj)
             rows = curs3.execute(sql)
             
-            data[-1].append(list(rows))#map(lambda x: x[0],rows))
+            data[-1].append(list(rows))  # map(lambda x: x[0],rows))
 #            data[-1].append(-1)
             t_ct += 1
         
 #        data[-1].pop()
-#         print "person {} : {} trajectories processed.".format(person,t_ct)
+#         print("person {} : {} trajectories processed.".format(person,t_ct))
         ct_pers += 1
     
     if(withDates):
@@ -178,13 +176,12 @@ def loadData(spatialRes, temporalRes, personsId = "All", withDates = False):
             for traj in pers :
                 rtn[-1].extend(map(lambda x: x[0],traj))
             
-    print "Nb persons loaded : {}".format(ct_pers)
-    print "Data loaded"
+    print("Nb persons loaded : {}".format(ct_pers))
+    print("Data loaded")
     return np.array(rtn), personsId
 
 
-
-#Computation of Nside, corresponding to the spatial resolution :
+# Computation of Nside, corresponding to the spatial resolution :
 def ComputeNside(spatialRes):
     i = 0
     listRes = []
@@ -192,40 +189,43 @@ def ComputeNside(spatialRes):
     while True :
         listNpix.append(hp.nside2npix(2**i))
         listRes.append(510072000000000//listNpix[i])
-    #     print "{} : Npix = {} ; approxRes = {}".format(i,listNpix[-1],listRes[-1]) 
+    #     print("{} : Npix = {} ; approxRes = {}".format(i,listNpix[-1],listRes[-1]))
         if listRes[-1] < spatialRes :
             break
         i += 1
     
-    #find the nearest value :
-    listRes = np.asarray(listRes)#Convertion into an numpy array :
+    # find the nearest value :
+    listRes = np.asarray(listRes)   # Convertion into an numpy array :
     idx = (np.abs(listRes-spatialRes)).argmin()
     nearestSpatialRes = listRes[idx]
     npix = listNpix[idx]
     nside = hp.npix2nside(npix)
-    print "nearestSpatialRes = {}, Npix = {} and Nside = {}".format(nearestSpatialRes, npix, nside)
+    print("nearestSpatialRes = {}, Npix = {} and Nside = {}".format(nearestSpatialRes, npix, nside))
     return nside
 
-def buildPreprocessingTable(spatialRes,temporalRes,nest = True, personsIds = [0, 1, 2, 3, 4, 5, 7, 9, 12, 13, 14, 15, 16, 17, 22, 24, 153, 28, 30, 35, 36, 38, 39, 40, 43, 44, 50, 179, 52, 55, 68, 71, 82, 84, 85, 92, 96, 101, 104, 167, 119, 126]):
+
+def buildPreprocessingTable(spatialRes, temporalRes, nest=True, personsIds = (0, 1, 2, 3, 4, 5, 7, 9, 12, 13, 14, 15,
+                                                                              16, 17, 22, 24, 153, 28, 30, 35, 36, 38,
+                                                                              39, 40, 43, 44, 50, 179, 52, 55, 68, 71,
+                                                                              82, 84, 85, 92, 96, 101, 104, 167, 119, 126)):
 
     data = []
     nside = ComputeNside(spatialRes)
    
-    #connection to the DataBase :
+    # connection to the DataBase :
     connectionOrig=apsw.Connection(main_geolifedb)
     
-    #loading it in the memory :
+    # loading it in the memory :
     writingConn=apsw.Connection(":memory:")
 #     with conn.backup("main", connectionOrig, "main") as backup:
 #         backup.step() # copy whole database in one go
-    
-    
+
     curs1 = connectionOrig.cursor()
     curs2 = connectionOrig.cursor()
     curs3 = connectionOrig.cursor()
     writingCurs = writingConn.cursor()
     
-    #Create table :
+    # Create table :
 #     sql = "DROP TABLE IF EXISTS {}".format(tableName)
 #     writingCurs.execute(sql)
     writingCurs.execute("CREATE TABLE preproc (person INT, traj INT, idxPix INT, datetime TEXT)")
@@ -243,7 +243,7 @@ def buildPreprocessingTable(spatialRes,temporalRes,nest = True, personsIds = [0,
 #    
     for pId in personsIds :
         
-        print 'Considering s: {} t:{} Person {}'.format(spatialRes,temporalRes,pId)
+        print('Considering s: {} t:{} Person {}'.format(spatialRes,temporalRes,pId))
         
         person = pId
 #        person =0
@@ -254,11 +254,11 @@ def buildPreprocessingTable(spatialRes,temporalRes,nest = True, personsIds = [0,
         
         prev = 0
         t_ct = 0
-        #for each trajectories
+        # for each trajectories
         for t in trajectories:
-            #select the first element of the tuple given by sqlite:
+            # select the first element of the tuple given by sqlite:
             traj = t[0]
-            #make a sql query for 
+            # make a sql query for
             sql = "SELECT longitude ,latitude , datetime FROM geolife WHERE person = {} AND NOT datetime = '' AND traj = {} ORDER BY datetime".format(person,traj)
             rows = curs1.execute(sql)
             
@@ -269,38 +269,37 @@ def buildPreprocessingTable(spatialRes,temporalRes,nest = True, personsIds = [0,
             for row in rows:
                 actualTime = dt.strptime(row[2],fmt)
                 
-                #If this is the first trajectory, set the time origin :
+                # If this is the first trajectory, set the time origin :
                 if ct==0:
-                    #Next time is the next time a location have to be taken
+                    # Next time is the next time a location have to be taken
                     if t_ct == 0 :
-                        #If it's the first trajectory of the person, just set the time origin at the first point
+                        # If it's the first trajectory of the person, just set the time origin at the first point
                         nextTime = actualTime
                         points.append((person,traj,int(getIdxPix(row[0],row[1])),nextTime.strftime(fmt)))
                         nextTime += temporalRes
                         
                     else :
-                        #Determine the number of symbols missing. 
+                        # Determine the number of symbols missing.
                         nb_loc_missing = int((actualTime- nextTime).total_seconds()//temporalRes.total_seconds()+1)
-                        #Determine the next date where a location have to be taken:
+                        # Determine the next date where a location have to be taken:
                         nextTime = nb_loc_missing * temporalRes + nextTime
     #                    #If the ending and beginning locations of a gap in the GPS records are the same, 
     #                        #the user is taken as dwelling at the same location during that time.
     #                    if (int(getIdxPix(row[0],row[1])) == data[-1][-1][1]):
-    #                        print "Fill blank-----------------------------------------------------", nb_loc_missing
-                #Else if the time is over the next time, this mean that we have to record the point  
+    #                        print("Fill blank-----------------------------------------------------", nb_loc_missing)
+                # Else if the time is over the next time, this mean that we have to record the point
                 elif actualTime > nextTime :
-                    #Check witch point is the closer :
-                    #This one: 
+                    # Check witch point is the closer :
+                    # This one:
                     if abs(nextTime - actualTime) < abs(nextTime - dt.strptime(prev[2],fmt)):
-                        #record the point :
+                        # record the point :
                         points.append((person,traj,int(getIdxPix(row[0],row[1])),nextTime.strftime(fmt)))
-                    #Or the previous one ?
+                    # Or the previous one ?
                     else :
-                        #record the point :
+                        # record the point :
                         points.append((person,traj,int(getIdxPix(prev[0],prev[1])),nextTime.strftime(fmt)))
                     nextTime += temporalRes
-                
-                    
+
                 ct += 1
                 prev = row
             t_ct += 1
@@ -309,48 +308,43 @@ def buildPreprocessingTable(spatialRes,temporalRes,nest = True, personsIds = [0,
                 if len(points) > 1 :
                     writingCurs.executemany("INSERT INTO preproc (person,traj,idxPix,datetime) VALUES (?,?,?,?)",points)
                 
-            print "S: {} T: {} Person {}: {} trajectories processed".format( spatialRes,temporalRes, person, t_ct )
+            print("S: {} T: {} Person {}: {} trajectories processed".format( spatialRes,temporalRes, person, t_ct ))
 
-    #writing the informations about the sample :
+    # writing the informations about the sample :
     writingCurs.execute("CREATE TABLE infoSample (nside INT)")
     sql = "INSERT INTO infoSample VALUES ({})".format(nside)
     writingCurs.execute(sql)
     
-    #Creating index :
-    print "Creating index..."
+    # Creating index :
+    print("Creating index...")
     sql = """CREATE INDEX idx_person_preproc ON preproc(person);
          CREATE INDEX idx_person_traj_preproc ON preproc(person,traj);
          CREATE INDEX idx_traj_preproc ON preproc(traj);
          CREATE INDEX idx_traj_datetime_preproc ON preproc(traj,datetime);"""
     writingCurs.execute(sql)
-   
-   
-    print "Cleaning up..."
+
+    print("Cleaning up...")
     writingCurs.execute("vacuum")
     writingCurs.close()
    
-    print "Writing out the database file..."
-    
-    
-    #Create the database file 
+    print("Writing out the database file...")
+
+    # Create the database file
     filename = "S{}T{}.sqlite".format(spatialRes, temporalRes)
     path = preprocessing_dir + "/" + filename
     ensure_dir(path)
     f = open(path, 'w')
     f.close()   
     # Now write out the database back to a file in one go
-    
 
     connection=apsw.Connection(path)
     with connection.backup("main", writingConn, "main") as backup:
         backup.step() # copy whole database in one go
 
-    print "Done"
-
+    print("Done")
 
 
 def build_main_db():
-    
     ensure_dir(main_geolifedb)
     
     connectionOrig=apsw.Connection(main_geolifedb)
@@ -358,22 +352,19 @@ def build_main_db():
     create_table_SQL = 'CREATE TABLE geolife(person INT,  traj INT,  latitude REAL,  longitude REAL,  datetime TEXT);'
     
     curs1orig.execute( create_table_SQL )
-    
-    
+
     mainDirectory = geolife_zipfile_data_dir
     persons = os.listdir(mainDirectory)
-    
-    
+
     for person in persons:
-    
-        print "person n " + person
+        print("person n " + person)
         files = os.listdir(mainDirectory + '/' + person + '/Trajectory')
         
         sqlList = []
         for trajectoryFile in files:
             
             id_trajectory = trajectoryFile.split('.')[0]
-            print "\t" + id_trajectory
+            print("\t" + id_trajectory)
             with open(mainDirectory + '/' + person + '/Trajectory/' + trajectoryFile, 'r') as f:
                 ct = 0
                 for line in f:
@@ -382,17 +373,16 @@ def build_main_db():
                         sqlList.append((person,id_trajectory,data[0],data[1],data[-2] + " " + data[-1].replace('\n','').replace('\r','')))
                         
                     ct += 1
-                          
-                
+
             f.close()
-    
+
         curs1orig.execute('PRAGMA journal_mode = OFF; ') # turn of journalling for speed
         curs1orig.execute('BEGIN') # this will disable autocommit for speed, bundling it into a single commit
         curs1orig.executemany('INSERT INTO geolife VALUES(?,?,?,?,?)', sqlList)  
         curs1orig.execute('END')
-    
+
     connectionOrig.close()
-    print "Done"
+    print("Done")
 
 
 if __name__ == '__main__':
