@@ -118,7 +118,8 @@ def get_geolife_data(spatialRes, temporalRes, personsId = "All" ):
 #        Helper methods
 
 # load preprocessing data  from the data base :
-def loadData(spatialRes, temporalRes, personsId = "All", withDates = False):
+def loadData(spatialRes, temporalRes, personsId = "All",
+             withDates = False, returnstrings=True):
     print("loading...")
     
     connection = apsw.Connection("{}/S{}T{}.sqlite".format(preprocessing_dir,spatialRes, temporalRes))
@@ -175,6 +176,17 @@ def loadData(spatialRes, temporalRes, personsId = "All", withDates = False):
             rtn.append([])
             for traj in pers :
                 rtn[-1].extend(map(lambda x: x[0],traj))
+
+    """
+    For now I'm using this original code, but there are WAY too many
+    exit points. Better to reconcile this later on.
+    """
+    if returnstrings:
+        rtn_str = []
+        for seq_ in rtn:
+            keys_map = dict((v,k) for k,v in enumerate(set(seq_)))
+            rtn_str.append(''.join(chr(keys_map[k]) for k in seq_))
+        return np.array(rtn_str), personsId
             
     print("Nb persons loaded : {}".format(ct_pers))
     print("Data loaded")
@@ -204,10 +216,10 @@ def ComputeNside(spatialRes):
     return nside
 
 
-def buildPreprocessingTable(spatialRes, temporalRes, nest=True, personsIds = (0, 1, 2, 3, 4, 5, 7, 9, 12, 13, 14, 15,
-                                                                              16, 17, 22, 24, 153, 28, 30, 35, 36, 38,
-                                                                              39, 40, 43, 44, 50, 179, 52, 55, 68, 71,
-                                                                              82, 84, 85, 92, 96, 101, 104, 167, 119, 126)):
+def buildPreprocessingTable(spatialRes, temporalRes, nest=True, personsIds=(0, 1, 2, 3, 4, 5, 7, 9, 12, 13, 14, 15,
+                                                                            16, 17, 22, 24, 153, 28, 30, 35, 36, 38,
+                                                                            39, 40, 43, 44, 50, 179, 52, 55, 68, 71,
+                                                                            82, 84, 85, 92, 96, 101, 104, 167, 119, 126)):
 
     data = []
     nside = ComputeNside(spatialRes)
